@@ -1,37 +1,165 @@
 # Домашнее задание к занятию "`Название занятия`" - `Фамилия и имя студента`
 
 
-### Инструкция по выполнению домашнего задания
-
-   1. Сделайте `fork` данного репозитория к себе в Github и переименуйте его по названию или номеру занятия, например, https://github.com/имя-вашего-репозитория/git-hw или  https://github.com/имя-вашего-репозитория/7-1-ansible-hw).
-   2. Выполните клонирование данного репозитория к себе на ПК с помощью команды `git clone`.
-   3. Выполните домашнее задание и заполните у себя локально этот файл README.md:
-      - впишите вверху название занятия и вашу фамилию и имя
-      - в каждом задании добавьте решение в требуемом виде (текст/код/скриншоты/ссылка)
-      - для корректного добавления скриншотов воспользуйтесь [инструкцией "Как вставить скриншот в шаблон с решением](https://github.com/netology-code/sys-pattern-homework/blob/main/screen-instruction.md)
-      - при оформлении используйте возможности языка разметки md (коротко об этом можно посмотреть в [инструкции  по MarkDown](https://github.com/netology-code/sys-pattern-homework/blob/main/md-instruction.md))
-   4. После завершения работы над домашним заданием сделайте коммит (`git commit -m "comment"`) и отправьте его на Github (`git push origin`);
-   5. Для проверки домашнего задания преподавателем в личном кабинете прикрепите и отправьте ссылку на решение в виде md-файла в вашем Github.
-   6. Любые вопросы по выполнению заданий спрашивайте в чате учебной группы и/или в разделе “Вопросы по заданию” в личном кабинете.
-   
-Желаем успехов в выполнении домашнего задания!
-   
-### Дополнительные материалы, которые могут быть полезны для выполнения задания
-
-1. [Руководство по оформлению Markdown файлов](https://gist.github.com/Jekins/2bf2d0638163f1294637#Code)
-
 ---
 
 ### Задание 1
 
-`Приведите ответ в свободной форме........`
 
-1. `Заполните здесь этапы выполнения, если требуется ....`
-2. `Заполните здесь этапы выполнения, если требуется ....`
-3. `Заполните здесь этапы выполнения, если требуется ....`
-4. `Заполните здесь этапы выполнения, если требуется ....`
-5. `Заполните здесь этапы выполнения, если требуется ....`
-6. 
+
+1. `Создаю файл provider.tf`
+
+```
+terraform {
+  required_providers {
+    yandex = {
+      source  = "yandex-cloud/yandex"
+      version = "~> 0.98"
+    }
+  }
+}
+
+provider "yandex" {
+  cloud_id  = "b1gvjpk4qbrvling8qq1"
+  folder_id = "b1gse67sen06i8u6ri78"
+  zone      = "ru-central1-a"
+}
+
+```
+2. `Создаю VPC и подсети в network.tf`
+```
+resource "yandex_vpc_network" "main" {
+  name = "netology-vpc"
+}
+
+resource "yandex_vpc_subnet" "public" {
+  name           = "public"
+  zone           = "ru-central1-a"
+  network_id     = yandex_vpc_network.main.id
+  v4_cidr_blocks = ["192.168.10.0/24"]
+}
+
+```
+3. `Файл nat.tf`
+```
+resource "yandex_compute_instance" "nat" {
+  name        = "nat-instance"
+  platform_id = "standard-v1"
+  zone        = "ru-central1-a"
+
+  resources {
+    cores  = 2
+    memory = 2
+  }
+
+  boot_disk {
+    initialize_params {
+      image_id = "fd80mrhj8fl2oe87o4e1"
+    }
+  }
+
+  network_interface {
+    subnet_id          = yandex_vpc_subnet.public.id
+    ip_address         = "192.168.10.254"
+    nat                = true
+  }
+
+  metadata = {
+    ssh-keys = "ubuntu:${file("~/.ssh/id_ed25519.pub")}"
+  }
+}
+
+```
+
+4. `Таблица маршрутов для приватной сети в route.tf`
+
+```
+resource "yandex_vpc_route_table" "private_rt" {
+  name       = "private-rt"
+  network_id = yandex_vpc_network.main.id
+
+  static_route {
+    destination_prefix = "0.0.0.0/0"
+    next_hop_address   = yandex_compute_instance.nat.network_interface.0.ip_address
+  }
+}
+
+resource "yandex_vpc_subnet" "private" {
+  name           = "private"
+  zone           = "ru-central1-a"
+  network_id     = yandex_vpc_network.main.id
+  v4_cidr_blocks = ["192.168.20.0/24"]
+  route_table_id = yandex_vpc_route_table.private_rt.id
+}
+
+```
+
+5. `Виртуальные машины`
+6. `Публичная`
+```
+resource "yandex_compute_instance" "public_vm" {
+  name        = "public-vm"
+  platform_id = "standard-v1"
+  zone        = "ru-central1-a"
+
+  resources {
+    cores  = 2
+    memory = 2
+  }
+
+  boot_disk {
+    initialize_params {
+      image_id = "fd855c73qshgd71tugqk"
+    }
+  }
+
+  network_interface {
+    subnet_id = yandex_vpc_subnet.public.id
+    nat       = true
+  }
+
+  metadata = {
+    ssh-keys = "ubuntu:${file("~/.ssh/id_ed25519.pub")}"
+  }
+}
+
+```
+
+6. `Приватная`
+
+```
+resource "yandex_compute_instance" "private_vm" {
+  name        = "private-vm"
+  platform_id = "standard-v1"
+  zone        = "ru-central1-a"
+
+  resources {
+    cores  = 2
+    memory = 2
+  }
+
+  boot_disk {
+    initialize_params {
+      image_id = "fd855c73qshgd71tugqk"
+    }
+  }
+
+  network_interface {
+    subnet_id = yandex_vpc_subnet.private.id
+    nat       = false
+  }
+
+  metadata = {
+    ssh-keys = "ubuntu:${file("~/.ssh/id_ed25519.pub")}"
+  }
+}
+
+```
+6. `Заполните здесь этапы выполнения, если требуется ....`
+6. `Заполните здесь этапы выполнения, если требуется ....`
+
+
+
 
 ```
 Поле для вставки кода...
