@@ -175,9 +175,11 @@ export YC_TOKEN=$(yc iam create-token)
 
 
 
-9. `Проверяю ip адреса в веб YC`
+9. `Проверяю ip адреса в веб YC\смотрю подсети`
 
 ![2](https://github.com/Foxbeerxxx/org_network_k8s/blob/main/img/img2.png)
+
+![6](https://github.com/Foxbeerxxx/org_network_k8s/blob/main/img/img6.png)
 
 10. `Подключаюсь на публичную ВМ по ssh`
 
